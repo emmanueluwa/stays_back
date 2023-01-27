@@ -1,7 +1,8 @@
-import { Arg, Field, Mutation, ObjectType, Query, Resolver } from "type-graphql"
+import { Arg, Ctx, Field, Mutation, ObjectType, Query, Resolver } from "type-graphql"
 import {hash, compare} from 'bcryptjs';
 import {sign} from 'jsonwebtoken';
 import { User } from "./entity/User";
+import { MyContext } from "./MyContext";
 require("dotenv").config();
 
 
@@ -32,7 +33,9 @@ export class UserResolver {
   @Mutation(() => LoginResponse)
   async login(
     @Arg('email') email: string,
-    @Arg('password') password: string
+    @Arg('password') password: string,
+    //access context for refresh token
+    @Ctx() {res}: MyContext
   ): Promise<LoginResponse> {
 
     //check user exists
@@ -50,7 +53,15 @@ export class UserResolver {
     }
 
     //successful login
-
+    res.cookie(
+      "jid", 
+      sign({ userId: user.id}, "boinasonj", {
+        expiresIn: "7d"
+      }),
+      {
+        httpOnly: true
+      }
+      );
 
 
     return {
