@@ -4,6 +4,7 @@ import { User } from "./entity/User";
 import { MyContext } from "./MyContext";
 import { createAccessToken, createRefreshToken } from "./auth";
 import { isAuth } from "./isAuth";
+import { sendRefreshToken } from "./sendRefreshToken";
 require("dotenv").config();
 
 
@@ -65,14 +66,7 @@ export class UserResolver {
     }
 
     //successful login
-    res.cookie(
-      "jid",
-      createRefreshToken(user),
-      {
-        httpOnly: true
-      }
-    );
-
+    sendRefreshToken(res, createRefreshToken(user));
 
     return {
       accessToken: createAccessToken(user)
