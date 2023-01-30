@@ -1,10 +1,11 @@
-import { Arg, Ctx, Field, Mutation, ObjectType, Query, Resolver, UseMiddleware } from "type-graphql"
+import { Arg, Ctx, Field, Int, Mutation, ObjectType, Query, Resolver, UseMiddleware } from "type-graphql"
 import { hash, compare } from 'bcryptjs';
 import { User } from "./entity/User";
 import { MyContext } from "./MyContext";
 import { createAccessToken, createRefreshToken } from "./auth";
 import { isAuth } from "./isAuth";
 import { sendRefreshToken } from "./sendRefreshToken";
+import { AppDataSource } from "./data-source";
 require("dotenv").config();
 
 
@@ -41,6 +42,21 @@ export class UserResolver {
     return User.find();
   }
 
+
+  /*
+      REPLACE WITH A FORGOT PASSWORD FUNCTION
+      NOT GOOD PRACTICE TO BE EXPOSED
+  */
+ @Mutation(() => Boolean)
+ async revokeRefreshTokensForUser(
+  @Arg('userId', () => Int) userId: number
+ ) {
+    await AppDataSource.getRepository(User)
+      .increment({ id: userId }, "tokenVersion", 1);
+     
+    return true;
+ }
+    
 
   //logging in
   @Mutation(() => LoginResponse)
