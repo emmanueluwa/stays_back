@@ -6,6 +6,7 @@ import { createAccessToken, createRefreshToken } from "./auth";
 import { isAuth } from "./isAuth";
 import { sendRefreshToken } from "./sendRefreshToken";
 import { AppDataSource } from "./data-source";
+import { verify } from "jsonwebtoken";
 require("dotenv").config();
 
 
@@ -14,6 +15,8 @@ require("dotenv").config();
 class LoginResponse {
   @Field()
   accessToken: string;
+  @Field(() => User)
+  user: User;
 }
 
 
@@ -40,7 +43,40 @@ export class UserResolver {
   @Query(() => [User])
   users() {
     return User.find();
+  } 
+
+
+  //getting logged in user
+  @Query(() => User, {nullable: true})
+  me(
+    @Ctx() context: MyContext
+  ) {
+    //read token from header to get user
+    const authorization = context.req.headers['authorization'];
+
+    if (!authorization) {
+      return null;
+    }
+
+    try {
+      const token = authorization.split(" ")[1];
+      const payload: any = verify(token, process.env.ACCESS_TOKEN_SECRET!);
+      return User.findOne({where: payload.userId});
+    } catch(err) {
+      console.log(err)
+      return null;
+    }
   }
+
+
+  //logging user out
+  @Mutation(() => Boolean)
+  async logout(@Ctx() {res}: MyContext) {
+    //send empty refresh token
+    sendRefreshToken(res, "");
+     
+    return true;
+ }
 
 
   /*
@@ -85,7 +121,8 @@ export class UserResolver {
     sendRefreshToken(res, createRefreshToken(user));
 
     return {
-      accessToken: createAccessToken(user)
+      accessToken: createAccessToken(user),
+      user
     };
   }
 
