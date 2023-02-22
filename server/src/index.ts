@@ -19,7 +19,7 @@ import { sendRefreshToken } from "./sendRefreshToken";
     const app = express();
     app.use(cors({
         credentials: true,
-        origin: "https://stays.vercel.app",
+        origin: ["https://stays.vercel.app/", "https://stays-emmanueluwa.vercel.app/"],
         methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
         allowedHeaders: ['Content-Type', 'Authorization'],
     }))
