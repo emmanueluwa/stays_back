@@ -18,9 +18,10 @@ import { sendRefreshToken } from "./sendRefreshToken";
 (async () => {
     const app = express();
     app.use(cors({
-        origin: "https://stays.vercel.app",
         credentials: true,
-        methods: 'GET,PUT,POST,DELETE'
+        origin: "https://stays.vercel.app",
+        methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+        allowedHeaders: ['Content-Type', 'Authorization'],
     }))
     app.use(cookieParser());
     app.get("/", (_req, res) => res.send("obota"));
