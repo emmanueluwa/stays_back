@@ -18,7 +18,7 @@ import { sendRefreshToken } from "./sendRefreshToken";
 (async () => {
     const app = express();
     app.use(cors({
-        origin: "http://localhost:3000",
+        origin: "https://stays.vercel.app",
         credentials: true,
     }))
     app.use(cookieParser());
