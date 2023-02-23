@@ -19,18 +19,13 @@ import { sendRefreshToken } from "./sendRefreshToken";
     const app = express();
     app.use(cors({
         credentials: true,
-        origin: ["https://stays.vercel.app/", "https://stays-emmanueluwa.vercel.app/"],
+        origin: ["https://stays.vercel.app", "https://stays-emmanueluwa.vercel.app"],
         methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
         allowedHeaders: ['Content-Type', 'Authorization'],
-        
     }))
-    app.use((_req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'https://stays.vercel.app/');
-    next();
-    });
     app.use(cookieParser());
     app.get("/", (_req, res) => res.send("obota"));
-    app.post("https://staysback.up.railway.app/refresh_token", async (req, res) => {
+    app.post("/refresh_token", async (req, res) => {
         const token = req.cookies.jid;
 
         if (!token) {
