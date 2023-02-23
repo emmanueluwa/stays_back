@@ -17,6 +17,12 @@ import { sendRefreshToken } from "./sendRefreshToken";
 
 (async () => {
     const app = express();
+    app.use(function (_req, res, next) {
+        res.setHeader('Access-Control-Allow-Origin', 'https://stays.vercel.app');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        next();
+    });
     app.use(cors({
         credentials: true,
         origin: ["https://stays.vercel.app", "https://stays-emmanueluwa.vercel.app"],
