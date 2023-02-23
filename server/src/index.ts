@@ -18,7 +18,7 @@ import { sendRefreshToken } from "./sendRefreshToken";
 (async () => {
     const app = express();
     app.use(function (_req, res, next) {
-        res.setHeader('Access-Control-Allow-Origin', 'https://stays.vercel.app');
+        res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
         next();
@@ -31,7 +31,7 @@ import { sendRefreshToken } from "./sendRefreshToken";
     }))
     app.use(cookieParser());
     app.get("/", (_req, res) => res.send("obota"));
-    app.post("/*/refresh_token", async (req, res) => {
+    app.post("/refresh_token", async (req, res) => {
         const token = req.cookies.jid;
 
         if (!token) {
