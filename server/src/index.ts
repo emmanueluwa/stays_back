@@ -30,7 +30,7 @@ import { sendRefreshToken } from "./sendRefreshToken";
     });
     app.use(cookieParser());
     app.get("/", (_req, res) => res.send("obota"));
-    app.post("/refresh_token", async (req, res) => {
+    app.post("https://staysback.up.railway.app/refresh_token", async (req, res) => {
         const token = req.cookies.jid;
 
         if (!token) {
