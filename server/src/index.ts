@@ -19,7 +19,7 @@ import { sendRefreshToken } from "./sendRefreshToken";
     const app = express();
     app.use(function (_req, res, next) {
         res.setHeader('Access-Control-Allow-Origin', '*');
-        res.header(
+        res.setHeader(
             'Access-Control-Allow-Headers',
             'Origin, X-Requested-With, Content-Type, Accept'
             );
