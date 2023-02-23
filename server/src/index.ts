@@ -22,7 +22,12 @@ import { sendRefreshToken } from "./sendRefreshToken";
         origin: ["https://stays.vercel.app/", "https://stays-emmanueluwa.vercel.app/"],
         methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
         allowedHeaders: ['Content-Type', 'Authorization'],
+        
     }))
+    app.use((_req, res, next) => {
+    res.header('Access-Control-Allow-Origin', 'https://stays.vercel.app/');
+    next();
+    });
     app.use(cookieParser());
     app.get("/", (_req, res) => res.send("obota"));
     app.post("/refresh_token", async (req, res) => {
