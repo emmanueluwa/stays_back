@@ -15,22 +15,34 @@ import { sendRefreshToken } from "./sendRefreshToken";
 
 
 
+
 (async () => {
+    const session = require("express-session");
     const app = express();
-    app.use(function (_req, res, next) {
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader(
-            'Access-Control-Allow-Headers',
-            'Origin, X-Requested-With, Content-Type, Accept'
-            );
-        next();
-    });
-    app.use(cors({
-        credentials: true,
-        origin: ["https://stays.vercel.app", "https://stays-emmanueluwa.vercel.app"],
-        methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-        allowedHeaders: 'Content-Type, Authorization',
-    }))
+
+    let RedisStore = require("connect-redis")(session)
+    const { createClient } = require("redis");
+    let redisClient = createClient({ legacyMode: true })
+
+    app.use(
+        session({
+            name: 'qid',
+            store: new RedisStore({ 
+                client: redisClient,
+                //reduce no. of requests made to redis
+                disableTouch: true,
+            }),
+            cookie: {
+                maxAge: 1000 * 60 * 60 * 24 * 365 * 10, // 10 years
+                httpOnly: true,
+                sameSite: 'lax',  // protecting csrf
+                // secure: __prod__,  // cookie only works in https
+            },
+            saveUninitialize: false,
+            secret: 'onkcwaonjcaqon',
+            resave: false,
+        })
+    )
     app.use(cookieParser());
     app.get("/", (_req, res) => res.send("obota"));
     app.post("/refresh_token", async (req, res) => {
