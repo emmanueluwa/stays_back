@@ -9,14 +9,25 @@ import { AppDataSource } from "./data-source";
 import { verify } from "jsonwebtoken";
 require("dotenv").config();
 
+//type response for errors, user friendly error message for ui
+@ObjectType()
+class FieldError {
+  @Field()
+  field: string;
+  @Field()
+  message: string;
+}
 
 //graphql type
-@ObjectType()
+@ObjectType() 
 class LoginResponse {
+  @Field(() => [FieldError], { nullable: true })
+  errors?: FieldError[];
+
   @Field()
-  accessToken: string;
-  @Field(() => User)
-  user: User;
+  accessToken?: string;
+  @Field(() => User, { nullable: true })
+  user?: User;
 }
 
 
@@ -24,7 +35,7 @@ class LoginResponse {
 @Resolver()
 export class UserResolver {
   @Query(() => String)
-  obota() {
+  obota() { 
     return "Obota!";
   }
 
@@ -107,14 +118,28 @@ export class UserResolver {
     const user = await User.findOne({ where: { email } });
 
     if (!user) {
-      throw new Error('invalid login')
+      return {
+        errors: [
+          {
+          field: "email",
+          message: "incorrect email/password",
+        },
+      ],
+      };
     }
 
     //comparing password
     const valid = await compare(password, user.password)
 
     if (!valid) {
-      throw new Error('invalid login')
+      return {
+        errors: [
+          {
+          field: "password",
+          message: "incorrect email/password",
+        },
+      ],
+      };
     }
 
     //successful login
