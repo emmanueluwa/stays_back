@@ -10,6 +10,7 @@ import { AppDataSource } from "./data-source";
 import cookieParser from "cookie-parser";
 import { verify } from "jsonwebtoken";
 import cors from 'cors';
+import Redis from "ioredis";
 import { User } from "./entity/User";
 import { createAccessToken, createRefreshToken } from "./auth";
 import { sendRefreshToken } from "./sendRefreshToken";
@@ -24,8 +25,7 @@ import { sendEmail } from "./utils/sendEmail";
     const app = express();
 
     let RedisStore = require("connect-redis")(session)
-    const { createClient } = require("redis");
-    let redisClient = createClient()
+    const redis = new Redis(); 
 
     app.use(
         cors({
@@ -38,7 +38,7 @@ import { sendEmail } from "./utils/sendEmail";
         session({
             name: COOKIE_NAME,
             store: new RedisStore({ 
-                client: redisClient,
+                client: redis,
                 //reduce no. of requests made to redis
                 disableTouch: true,
             }),
@@ -93,9 +93,10 @@ import { sendEmail } from "./utils/sendEmail";
 
     const apolloServer = new ApolloServer({
         schema: await buildSchema({
-            resolvers: [UserResolver]
+            resolvers: [UserResolver],
+            validate: false
         }),
-        context: ({ req, res }) => ({ req, res })
+        context: ({ req, res }) => ({ req, res, redis })
     });
 
     await apolloServer.start()

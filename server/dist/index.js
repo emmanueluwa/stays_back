@@ -14,6 +14,7 @@ const data_source_1 = require("./data-source");
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const jsonwebtoken_1 = require("jsonwebtoken");
 const cors_1 = __importDefault(require("cors"));
+const ioredis_1 = __importDefault(require("ioredis"));
 const User_1 = require("./entity/User");
 const auth_1 = require("./auth");
 const sendRefreshToken_1 = require("./sendRefreshToken");
@@ -23,8 +24,7 @@ const sendEmail_1 = require("./utils/sendEmail");
     const session = require("express-session");
     const app = (0, express_1.default)();
     let RedisStore = require("connect-redis")(session);
-    const { createClient } = require("redis");
-    let redisClient = createClient();
+    const redis = new ioredis_1.default();
     app.use((0, cors_1.default)({
         origin: "http://localhost:3000",
         credentials: true,
@@ -32,7 +32,7 @@ const sendEmail_1 = require("./utils/sendEmail");
     app.use(session({
         name: constants_1.COOKIE_NAME,
         store: new RedisStore({
-            client: redisClient,
+            client: redis,
             disableTouch: true,
         }),
         cookie: {
@@ -73,9 +73,10 @@ const sendEmail_1 = require("./utils/sendEmail");
     await data_source_1.AppDataSource.initialize();
     const apolloServer = new apollo_server_express_1.ApolloServer({
         schema: await (0, type_graphql_1.buildSchema)({
-            resolvers: [UserResolver_1.UserResolver]
+            resolvers: [UserResolver_1.UserResolver],
+            validate: false
         }),
-        context: ({ req, res }) => ({ req, res })
+        context: ({ req, res }) => ({ req, res, redis })
     });
     await apolloServer.start();
     apolloServer.applyMiddleware({

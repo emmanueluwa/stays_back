@@ -1,12 +1,15 @@
 import { Arg, Ctx, Field, Int, Mutation, ObjectType, Query, Resolver, UseMiddleware } from "type-graphql"
 import { hash, compare } from 'bcryptjs';
 import { User } from "./entity/User";
-import { MyContext } from "./MyContext";
+import { MyContext } from "./types";
 import { createAccessToken, createRefreshToken } from "./auth";
 import { isAuth } from "./isAuth";
 import { sendRefreshToken } from "./sendRefreshToken";
 import { AppDataSource } from "./data-source";
 import { verify } from "jsonwebtoken";
+import { sendEmail } from "./utils/sendEmail";
+import {v4} from 'uuid';
+import { FORGET_PASSWORD_PREFIX } from "./constants";
 require("dotenv").config();
 
 //type response for errors, user friendly error message for ui
@@ -36,7 +39,10 @@ class LoginResponse {
 export class UserResolver {
   //forgot password
   @Mutation(() => Boolean)
-  async forgotPassword(@Arg('email') email: string, @Ctx() { res }: MyContext) {
+  async forgotPassword(
+    @Arg('email') email: string, 
+    @Ctx() { redis }: MyContext
+  ) {
 
     //check user exists
     const user = await User.findOne({ where: { email } });
@@ -51,6 +57,16 @@ export class UserResolver {
       ],
       };
     }
+
+    const token = v4();
+
+    //prefix infront of key allows seperation and ability to look them up
+    await redis.set(FORGET_PASSWORD_PREFIX + token, user.id, "EX", 1000 * 60 * 60 * 24 ) //1day to change
+    
+    await sendEmail(
+      email,
+      `<a href="http://localhost:3000/change-password/${token}">reset password</a>`
+    );
 
     return true;
   }

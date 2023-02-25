@@ -21,6 +21,9 @@ const isAuth_1 = require("./isAuth");
 const sendRefreshToken_1 = require("./sendRefreshToken");
 const data_source_1 = require("./data-source");
 const jsonwebtoken_1 = require("jsonwebtoken");
+const sendEmail_1 = require("./utils/sendEmail");
+const uuid_1 = require("uuid");
+const constants_1 = require("./constants");
 require("dotenv").config();
 let FieldError = class FieldError {
 };
@@ -53,7 +56,7 @@ LoginResponse = __decorate([
     (0, type_graphql_1.ObjectType)()
 ], LoginResponse);
 let UserResolver = class UserResolver {
-    async forgotPassword(email, { res }) {
+    async forgotPassword(email, { redis }) {
         const user = await User_1.User.findOne({ where: { email } });
         if (!user) {
             return {
@@ -65,6 +68,9 @@ let UserResolver = class UserResolver {
                 ],
             };
         }
+        const token = (0, uuid_1.v4)();
+        await redis.set(constants_1.FORGET_PASSWORD_PREFIX + token, user.id, "EX", 1000 * 60 * 60 * 24);
+        await (0, sendEmail_1.sendEmail)(email, `<a href="http://localhost:3000/change-password/${token}">reset password</a>`);
         return true;
     }
     obota() {
