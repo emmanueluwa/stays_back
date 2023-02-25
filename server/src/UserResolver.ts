@@ -37,6 +37,54 @@ class LoginResponse {
 //creating graphql schema
 @Resolver()
 export class UserResolver {
+  @Mutation(() => LoginResponse)
+  async changePassword(
+    @Arg('token') token: string,
+    @Arg('newPassword') newPassword: string,
+    @Ctx() {redis, req}: MyContext
+  ): Promise<LoginResponse> {
+    if (newPassword.length <= 2) {
+      return { errors: [
+        {
+          field: "newPassword",
+          message: "length must be greater than 2",
+        },
+      ],
+      };
+    }
+
+    //validate token in redis
+    const userId = await redis.get(FORGET_PASSWORD_PREFIX+token)
+    if (!userId) {
+      return { errors: [
+        {
+          field: "token",
+          message: "expired token",
+        },
+      ],
+    }
+    }
+
+    const user = await User.findOneBy({ id: parseInt(userId) });
+
+    if (!user) {
+      return { errors: [
+        {
+          field: "token",
+          message: "user no longer exists",
+        },
+      ],
+    }
+    }
+
+    user.password = await hash(newPassword, 12);
+
+    //log user in
+    req.session.userId = user.id;
+
+    return { user }
+  }
+
   //forgot password
   @Mutation(() => Boolean)
   async forgotPassword(

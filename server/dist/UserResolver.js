@@ -56,6 +56,40 @@ LoginResponse = __decorate([
     (0, type_graphql_1.ObjectType)()
 ], LoginResponse);
 let UserResolver = class UserResolver {
+    async changePassword(token, newPassword, { redis, req }) {
+        if (newPassword.length <= 2) {
+            return { errors: [
+                    {
+                        field: "newPassword",
+                        message: "length must be greater than 2",
+                    },
+                ],
+            };
+        }
+        const userId = await redis.get(constants_1.FORGET_PASSWORD_PREFIX + token);
+        if (!userId) {
+            return { errors: [
+                    {
+                        field: "token",
+                        message: "expired token",
+                    },
+                ],
+            };
+        }
+        const user = await User_1.User.findOneBy({ id: parseInt(userId) });
+        if (!user) {
+            return { errors: [
+                    {
+                        field: "token",
+                        message: "user no longer exists",
+                    },
+                ],
+            };
+        }
+        user.password = await (0, bcryptjs_1.hash)(newPassword, 12);
+        req.session.userId = user.id;
+        return { user };
+    }
     async forgotPassword(email, { redis }) {
         const user = await User_1.User.findOne({ where: { email } });
         if (!user) {
@@ -151,6 +185,15 @@ let UserResolver = class UserResolver {
         return true;
     }
 };
+__decorate([
+    (0, type_graphql_1.Mutation)(() => LoginResponse),
+    __param(0, (0, type_graphql_1.Arg)('token')),
+    __param(1, (0, type_graphql_1.Arg)('newPassword')),
+    __param(2, (0, type_graphql_1.Ctx)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:returntype", Promise)
+], UserResolver.prototype, "changePassword", null);
 __decorate([
     (0, type_graphql_1.Mutation)(() => Boolean),
     __param(0, (0, type_graphql_1.Arg)('email')),
