@@ -25,6 +25,13 @@ import { sendRefreshToken } from "./sendRefreshToken";
     let redisClient = createClient({ legacyMode: true })
 
     app.use(
+        cors({
+            origin: "http://localhost:3000",
+            credentials: true,
+        })
+    );
+
+    app.use(
         session({
             name: 'qid',
             store: new RedisStore({ 
@@ -91,7 +98,10 @@ import { sendRefreshToken } from "./sendRefreshToken";
     await apolloServer.start()
 
     //adding graphql stuff to express server
-    apolloServer.applyMiddleware({ app, cors: false });
+    apolloServer.applyMiddleware({ 
+        app, 
+        cors: false 
+    });
 
     app.listen(4000, () => {
         console.log("express server started.")
