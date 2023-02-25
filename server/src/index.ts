@@ -1,5 +1,6 @@
 import "dotenv/config";
 import "reflect-metadata";
+import { __prod__, COOKIE_NAME } from "./constants";
 import express from "express";
 import { ApolloServer } from 'apollo-server-express';
 import { UserResolver } from "./UserResolver";
@@ -12,17 +13,19 @@ import cors from 'cors';
 import { User } from "./entity/User";
 import { createAccessToken, createRefreshToken } from "./auth";
 import { sendRefreshToken } from "./sendRefreshToken";
+import { sendEmail } from "./utils/sendEmail";
 
 
 
 
 (async () => {
+    sendEmail("bob@bob.com", "hello there");
     const session = require("express-session");
     const app = express();
 
     let RedisStore = require("connect-redis")(session)
     const { createClient } = require("redis");
-    let redisClient = createClient({ legacyMode: true })
+    let redisClient = createClient()
 
     app.use(
         cors({
@@ -33,7 +36,7 @@ import { sendRefreshToken } from "./sendRefreshToken";
 
     app.use(
         session({
-            name: 'qid',
+            name: COOKIE_NAME,
             store: new RedisStore({ 
                 client: redisClient,
                 //reduce no. of requests made to redis
@@ -43,7 +46,7 @@ import { sendRefreshToken } from "./sendRefreshToken";
                 maxAge: 1000 * 60 * 60 * 24 * 365 * 10, // 10 years
                 httpOnly: true,
                 sameSite: 'lax',  // protecting csrf
-                // secure: __prod__,  // cookie only works in https
+                secure: __prod__,  // cookie only works in https
             },
             saveUninitialize: false,
             secret: 'onkcwaonjcaqon',

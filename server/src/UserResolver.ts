@@ -34,6 +34,27 @@ class LoginResponse {
 //creating graphql schema
 @Resolver()
 export class UserResolver {
+  //forgot password
+  @Mutation(() => Boolean)
+  async forgotPassword(@Arg('email') email: string, @Ctx() { res }: MyContext) {
+
+    //check user exists
+    const user = await User.findOne({ where: { email } });
+
+    if (!user) {
+      return {
+        errors: [
+          {
+          field: "email",
+          message: "incorrect email/password",
+        },
+      ],
+      };
+    }
+
+    return true;
+  }
+
   @Query(() => String)
   obota() { 
     return "Obota!";

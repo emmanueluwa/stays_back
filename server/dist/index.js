@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 require("dotenv/config");
 require("reflect-metadata");
+const constants_1 = require("./constants");
 const express_1 = __importDefault(require("express"));
 const apollo_server_express_1 = require("apollo-server-express");
 const UserResolver_1 = require("./UserResolver");
@@ -16,18 +17,20 @@ const cors_1 = __importDefault(require("cors"));
 const User_1 = require("./entity/User");
 const auth_1 = require("./auth");
 const sendRefreshToken_1 = require("./sendRefreshToken");
+const sendEmail_1 = require("./utils/sendEmail");
 (async () => {
+    (0, sendEmail_1.sendEmail)("bob@bob.com", "hello there");
     const session = require("express-session");
     const app = (0, express_1.default)();
     let RedisStore = require("connect-redis")(session);
     const { createClient } = require("redis");
-    let redisClient = createClient({ legacyMode: true });
+    let redisClient = createClient();
     app.use((0, cors_1.default)({
         origin: "http://localhost:3000",
         credentials: true,
     }));
     app.use(session({
-        name: 'qid',
+        name: constants_1.COOKIE_NAME,
         store: new RedisStore({
             client: redisClient,
             disableTouch: true,
@@ -36,6 +39,7 @@ const sendRefreshToken_1 = require("./sendRefreshToken");
             maxAge: 1000 * 60 * 60 * 24 * 365 * 10,
             httpOnly: true,
             sameSite: 'lax',
+            secure: constants_1.__prod__,
         },
         saveUninitialize: false,
         secret: 'onkcwaonjcaqon',

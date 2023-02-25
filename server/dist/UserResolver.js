@@ -53,6 +53,20 @@ LoginResponse = __decorate([
     (0, type_graphql_1.ObjectType)()
 ], LoginResponse);
 let UserResolver = class UserResolver {
+    async forgotPassword(email, { res }) {
+        const user = await User_1.User.findOne({ where: { email } });
+        if (!user) {
+            return {
+                errors: [
+                    {
+                        field: "email",
+                        message: "incorrect email/password",
+                    },
+                ],
+            };
+        }
+        return true;
+    }
     obota() {
         return "Obota!";
     }
@@ -131,6 +145,14 @@ let UserResolver = class UserResolver {
         return true;
     }
 };
+__decorate([
+    (0, type_graphql_1.Mutation)(() => Boolean),
+    __param(0, (0, type_graphql_1.Arg)('email')),
+    __param(1, (0, type_graphql_1.Ctx)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], UserResolver.prototype, "forgotPassword", null);
 __decorate([
     (0, type_graphql_1.Query)(() => String),
     __metadata("design:type", Function),
