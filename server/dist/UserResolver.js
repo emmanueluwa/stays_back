@@ -66,7 +66,8 @@ let UserResolver = class UserResolver {
                 ],
             };
         }
-        const userId = await redis.get(constants_1.FORGET_PASSWORD_PREFIX + token);
+        const key = constants_1.FORGET_PASSWORD_PREFIX + token;
+        const userId = await redis.get(key);
         if (!userId) {
             return { errors: [
                     {
@@ -87,6 +88,7 @@ let UserResolver = class UserResolver {
             };
         }
         user.password = await (0, bcryptjs_1.hash)(newPassword, 12);
+        redis.del();
         req.session.userId = user.id;
         return { user };
     }

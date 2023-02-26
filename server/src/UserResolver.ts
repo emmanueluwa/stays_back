@@ -54,7 +54,8 @@ export class UserResolver {
     }
 
     //validate token in redis
-    const userId = await redis.get(FORGET_PASSWORD_PREFIX+token)
+    const key = FORGET_PASSWORD_PREFIX + token
+    const userId = await redis.get(key);
     if (!userId) {
       return { errors: [
         {
@@ -78,6 +79,8 @@ export class UserResolver {
     }
 
     user.password = await hash(newPassword, 12);
+
+    redis.del()
 
     //log user in
     req.session.userId = user.id;

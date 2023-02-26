@@ -5,7 +5,7 @@ import express from "express";
 import { ApolloServer } from 'apollo-server-express';
 import { UserResolver } from "./UserResolver";
 import { buildSchema } from "type-graphql";
-// import { createConnection } from "typeorm";
+import { createConnection } from "typeorm";
 import { AppDataSource } from "./data-source";
 import cookieParser from "cookie-parser";
 import { verify } from "jsonwebtoken";

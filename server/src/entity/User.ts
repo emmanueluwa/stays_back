@@ -12,14 +12,11 @@ export class User extends BaseEntity {
 
     @Field()
     //default is text column
-    @Column("text")
+    @Column({ unique: true })
     email: string
 
     @Column("text")
     password: string
-
-    @Column("int", { default: 0 })
-    tokenVersion: number
 
 }
 
