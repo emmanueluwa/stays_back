@@ -9,18 +9,13 @@ const constants_1 = require("./constants");
 const express_1 = __importDefault(require("express"));
 const apollo_server_express_1 = require("apollo-server-express");
 const UserResolver_1 = require("./UserResolver");
+const PostResolver_1 = require("./PostResolver");
 const type_graphql_1 = require("type-graphql");
 const data_source_1 = require("./data-source");
-const cookie_parser_1 = __importDefault(require("cookie-parser"));
-const jsonwebtoken_1 = require("jsonwebtoken");
 const cors_1 = __importDefault(require("cors"));
 const ioredis_1 = __importDefault(require("ioredis"));
-const User_1 = require("./entity/User");
-const auth_1 = require("./auth");
-const sendRefreshToken_1 = require("./sendRefreshToken");
-const sendEmail_1 = require("./utils/sendEmail");
-(async () => {
-    (0, sendEmail_1.sendEmail)("bob@bob.com", "hello there");
+const main = async () => {
+    await data_source_1.AppDataSource.initialize();
     const session = require("express-session");
     const app = (0, express_1.default)();
     let RedisStore = require("connect-redis")(session);
@@ -45,35 +40,9 @@ const sendEmail_1 = require("./utils/sendEmail");
         secret: 'onkcwaonjcaqon',
         resave: false,
     }));
-    app.use((0, cookie_parser_1.default)());
-    app.get("/", (_req, res) => res.send("obota"));
-    app.post("/refresh_token", async (req, res) => {
-        const token = req.cookies.jid;
-        if (!token) {
-            return res.send({ ok: false, accessToken: "no token" });
-        }
-        let payload = null;
-        try {
-            payload = (0, jsonwebtoken_1.verify)(token, process.env.REFRESH_TOKEN_SECRET);
-        }
-        catch (err) {
-            console.log(err);
-            return res.send({ ok: false, accessToken: "" });
-        }
-        const user = await User_1.User.findOneBy({ id: payload.userId });
-        if (!user) {
-            return res.send({ ok: false, accessToken: "" });
-        }
-        if (user.tokenVersion !== payload.tokenVersion) {
-            return res.send({ ok: false, accessToken: "" });
-        }
-        (0, sendRefreshToken_1.sendRefreshToken)(res, (0, auth_1.createRefreshToken)(user));
-        return res.send({ ok: true, accessToken: (0, auth_1.createAccessToken)(user) });
-    });
-    await data_source_1.AppDataSource.initialize();
     const apolloServer = new apollo_server_express_1.ApolloServer({
         schema: await (0, type_graphql_1.buildSchema)({
-            resolvers: [UserResolver_1.UserResolver],
+            resolvers: [UserResolver_1.UserResolver, PostResolver_1.PostResolver],
             validate: false
         }),
         context: ({ req, res }) => ({ req, res, redis })
@@ -86,5 +55,8 @@ const sendEmail_1 = require("./utils/sendEmail");
     app.listen(4000, () => {
         console.log("express server started.");
     });
-})();
+};
+main().catch((err) => {
+    console.error(err);
+});
 //# sourceMappingURL=index.js.map

@@ -4,23 +4,20 @@ import { __prod__, COOKIE_NAME } from "./constants";
 import express from "express";
 import { ApolloServer } from 'apollo-server-express';
 import { UserResolver } from "./UserResolver";
+import { PostResolver } from "./PostResolver";
 import { buildSchema } from "type-graphql";
-import { createConnection } from "typeorm";
+// import { createConnection } from "typeorm";
 import { AppDataSource } from "./data-source";
-import cookieParser from "cookie-parser";
-import { verify } from "jsonwebtoken";
 import cors from 'cors';
 import Redis from "ioredis";
-import { User } from "./entity/User";
-import { createAccessToken, createRefreshToken } from "./auth";
-import { sendRefreshToken } from "./sendRefreshToken";
-import { sendEmail } from "./utils/sendEmail";
+// import { sendEmail } from "./utils/sendEmail";
 
 
+const main = async () => {
+    //creating a connection
+    await AppDataSource.initialize();
 
-
-(async () => {
-    sendEmail("bob@bob.com", "hello there");
+    // sendEmail("bob@bob.com", "hello there");
     const session = require("express-session");
     const app = express();
 
@@ -52,48 +49,11 @@ import { sendEmail } from "./utils/sendEmail";
             secret: 'onkcwaonjcaqon',
             resave: false,
         })
-    )
-    app.use(cookieParser());
-    app.get("/", (_req, res) => res.send("obota"));
-    app.post("/refresh_token", async (req, res) => {
-        const token = req.cookies.jid;
-
-        if (!token) {
-            return res.send({ ok: false, accessToken: "no token" });
-        }
-
-        let payload: any = null;
-
-        try {
-            payload = verify(token, process.env.REFRESH_TOKEN_SECRET!);
-        } catch (err) {
-            console.log(err);
-            return res.send({ ok: false, accessToken: ""});
-        }
-
-        // valid token, access token can be sent back
-        const user = await User.findOneBy({ id: payload.userId });
-
-        if (!user) {
-            return res.send({ ok: false, accessToken: "" });
-        }
-
-        if (user.tokenVersion !== payload.tokenVersion) {
-            return res.send({ ok: false, accessToken: "" });
-        }
-
-        //create new refresh token
-        sendRefreshToken(res, createRefreshToken(user))
-
-        return res.send({ ok: true, accessToken: createAccessToken(user) });
-    });
-
-    //creating a connection
-    await AppDataSource.initialize();
+    );
 
     const apolloServer = new ApolloServer({
         schema: await buildSchema({
-            resolvers: [UserResolver],
+            resolvers: [UserResolver, PostResolver],
             validate: false
         }),
         context: ({ req, res }) => ({ req, res, redis })
@@ -110,7 +70,11 @@ import { sendEmail } from "./utils/sendEmail";
     app.listen(4000, () => {
         console.log("express server started.")
     })
-})()
+};
+
+main().catch((err) => {
+    console.error(err);
+});
 
 
 // AppDataSource.initialize().then(async () => {
