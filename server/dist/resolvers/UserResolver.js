@@ -15,15 +15,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UserResolver = void 0;
 const type_graphql_1 = require("type-graphql");
 const bcryptjs_1 = require("bcryptjs");
-const User_1 = require("./entity/User");
-const auth_1 = require("./auth");
-const isAuth_1 = require("./isAuth");
-const sendRefreshToken_1 = require("./sendRefreshToken");
-const data_source_1 = require("./data-source");
-const jsonwebtoken_1 = require("jsonwebtoken");
-const sendEmail_1 = require("./utils/sendEmail");
+const User_1 = require("../entity/User");
+const data_source_1 = require("../data-source");
+const isAuth_1 = require("../middleware/isAuth");
+const sendEmail_1 = require("../utils/sendEmail");
 const uuid_1 = require("uuid");
-const constants_1 = require("./constants");
+const constants_1 = require("../constants");
+const UsernamePasswordInput_1 = require("./UsernamePasswordInput");
 require("dotenv").config();
 let FieldError = class FieldError {
 };
@@ -45,10 +43,6 @@ __decorate([
     __metadata("design:type", Array)
 ], LoginResponse.prototype, "errors", void 0);
 __decorate([
-    (0, type_graphql_1.Field)(),
-    __metadata("design:type", String)
-], LoginResponse.prototype, "accessToken", void 0);
-__decorate([
     (0, type_graphql_1.Field)(() => User_1.User, { nullable: true }),
     __metadata("design:type", User_1.User)
 ], LoginResponse.prototype, "user", void 0);
@@ -56,6 +50,12 @@ LoginResponse = __decorate([
     (0, type_graphql_1.ObjectType)()
 ], LoginResponse);
 let UserResolver = class UserResolver {
+    email(user, { req }) {
+        if (req.session.userId === user.id) {
+            return user.email;
+        }
+        return "";
+    }
     async changePassword(token, newPassword, { redis, req }) {
         if (newPassword.length <= 2) {
             return { errors: [
@@ -77,7 +77,8 @@ let UserResolver = class UserResolver {
                 ],
             };
         }
-        const user = await User_1.User.findOneBy({ id: parseInt(userId) });
+        const userIdNum = parseInt(userId);
+        const user = await User_1.User.findOneBy({ id: userIdNum });
         if (!user) {
             return { errors: [
                     {
@@ -87,7 +88,7 @@ let UserResolver = class UserResolver {
                 ],
             };
         }
-        user.password = await (0, bcryptjs_1.hash)(newPassword, 12);
+        await User_1.User.update({ id: userIdNum }, { password: await (0, bcryptjs_1.hash)(newPassword, 12) });
         redis.del();
         req.session.userId = user.id;
         return { user };
@@ -95,14 +96,7 @@ let UserResolver = class UserResolver {
     async forgotPassword(email, { redis }) {
         const user = await User_1.User.findOne({ where: { email } });
         if (!user) {
-            return {
-                errors: [
-                    {
-                        field: "email",
-                        message: "incorrect email/password",
-                    },
-                ],
-            };
+            return true;
         }
         const token = (0, uuid_1.v4)();
         await redis.set(constants_1.FORGET_PASSWORD_PREFIX + token, user.id, "EX", 1000 * 60 * 60 * 24);
@@ -119,31 +113,24 @@ let UserResolver = class UserResolver {
     users() {
         return User_1.User.find();
     }
-    me(context) {
-        const authorization = context.req.headers['authorization'];
-        if (!authorization) {
+    async me({ req }) {
+        if (!req.session.userId) {
             return null;
         }
-        try {
-            const token = authorization.split(" ")[1];
-            const payload = (0, jsonwebtoken_1.verify)(token, process.env.ACCESS_TOKEN_SECRET);
-            return User_1.User.findOne({ where: payload.userId });
-        }
-        catch (err) {
-            console.log(err);
-            return null;
-        }
+        return await User_1.User.findOneBy(req.session.userId);
     }
-    async logout({ res }) {
-        (0, sendRefreshToken_1.sendRefreshToken)(res, "");
-        return true;
+    async logout({ req, res }) {
+        return new Promise((resolve => req.session.destroy(err => {
+            res.clearCookie(constants_1.COOKIE_NAME);
+            if (err) {
+                console.log(err);
+                resolve(false);
+                return;
+            }
+            resolve(true);
+        })));
     }
-    async revokeRefreshTokensForUser(userId) {
-        await data_source_1.AppDataSource.getRepository(User_1.User)
-            .increment({ id: userId }, "tokenVersion", 1);
-        return true;
-    }
-    async login(email, password, { res }) {
+    async login(email, password, { req }) {
         const user = await User_1.User.findOne({ where: { email } });
         if (!user) {
             return {
@@ -166,27 +153,70 @@ let UserResolver = class UserResolver {
                 ],
             };
         }
-        (0, sendRefreshToken_1.sendRefreshToken)(res, (0, auth_1.createRefreshToken)(user));
+        req.session.userId = user.id;
         return {
-            accessToken: (0, auth_1.createAccessToken)(user),
             user
         };
     }
-    async register(email, password) {
-        const hashedPassword = await (0, bcryptjs_1.hash)(password, 12);
+    async register(options, { req }) {
+        if (!options.email.includes('@')) {
+            return {
+                errors: [
+                    {
+                        field: "email",
+                        message: "invalid email"
+                    }
+                ]
+            };
+        }
+        if (options.password.length <= 3) {
+            return {
+                errors: [
+                    {
+                        field: "password",
+                        message: "length must be greater than 3"
+                    }
+                ]
+            };
+        }
+        const hashedPassword = await (0, bcryptjs_1.hash)(options.password, 12);
+        let user;
         try {
-            await User_1.User.insert({
-                email,
+            const result = await data_source_1.AppDataSource
+                .createQueryBuilder()
+                .insert()
+                .into(User_1.User)
+                .values({
+                email: options.email,
                 password: hashedPassword
-            });
+            })
+                .returning("*").execute();
+            user = result.raw[0];
         }
         catch (err) {
-            console.log(err);
-            return false;
+            if (err.code === "23505") {
+                return {
+                    errors: [
+                        {
+                            field: "username",
+                            message: "username taken",
+                        },
+                    ],
+                };
+            }
         }
-        return true;
+        req.session.userId = user.id;
+        return { user };
     }
 };
+__decorate([
+    (0, type_graphql_1.FieldResolver)(() => String),
+    __param(0, (0, type_graphql_1.Root)()),
+    __param(1, (0, type_graphql_1.Ctx)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [User_1.User, Object]),
+    __metadata("design:returntype", void 0)
+], UserResolver.prototype, "email", null);
 __decorate([
     (0, type_graphql_1.Mutation)(() => LoginResponse),
     __param(0, (0, type_graphql_1.Arg)('token')),
@@ -229,7 +259,7 @@ __decorate([
     __param(0, (0, type_graphql_1.Ctx)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], UserResolver.prototype, "me", null);
 __decorate([
     (0, type_graphql_1.Mutation)(() => Boolean),
@@ -238,13 +268,6 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], UserResolver.prototype, "logout", null);
-__decorate([
-    (0, type_graphql_1.Mutation)(() => Boolean),
-    __param(0, (0, type_graphql_1.Arg)('userId', () => type_graphql_1.Int)),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
-    __metadata("design:returntype", Promise)
-], UserResolver.prototype, "revokeRefreshTokensForUser", null);
 __decorate([
     (0, type_graphql_1.Mutation)(() => LoginResponse),
     __param(0, (0, type_graphql_1.Arg)('email')),
@@ -255,15 +278,15 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], UserResolver.prototype, "login", null);
 __decorate([
-    (0, type_graphql_1.Mutation)(() => Boolean),
-    __param(0, (0, type_graphql_1.Arg)('email')),
-    __param(1, (0, type_graphql_1.Arg)('password')),
+    (0, type_graphql_1.Mutation)(() => LoginResponse),
+    __param(0, (0, type_graphql_1.Arg)('options')),
+    __param(1, (0, type_graphql_1.Ctx)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:paramtypes", [UsernamePasswordInput_1.UsernamePasswordInput, Object]),
     __metadata("design:returntype", Promise)
 ], UserResolver.prototype, "register", null);
 UserResolver = __decorate([
-    (0, type_graphql_1.Resolver)()
+    (0, type_graphql_1.Resolver)(User_1.User)
 ], UserResolver);
 exports.UserResolver = UserResolver;
 //# sourceMappingURL=UserResolver.js.map

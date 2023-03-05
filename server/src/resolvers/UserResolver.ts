@@ -1,15 +1,13 @@
-import { Arg, Ctx, Field, Int, Mutation, ObjectType, Query, Resolver, UseMiddleware } from "type-graphql"
+import { Arg, Ctx, Field, FieldResolver, Mutation, ObjectType, Query, Resolver, Root, UseMiddleware } from "type-graphql"
 import { hash, compare } from 'bcryptjs';
-import { User } from "./entity/User";
-import { MyContext } from "./types";
-import { createAccessToken, createRefreshToken } from "./auth";
-import { isAuth } from "./isAuth";
-import { sendRefreshToken } from "./sendRefreshToken";
-import { AppDataSource } from "./data-source";
-import { verify } from "jsonwebtoken";
-import { sendEmail } from "./utils/sendEmail";
+import { User } from "../entity/User";
+import { MyContext } from "../types";
+import { AppDataSource } from "../data-source";
+import { isAuth } from "../middleware/isAuth";
+import { sendEmail } from "../utils/sendEmail";
 import {v4} from 'uuid';
-import { FORGET_PASSWORD_PREFIX } from "./constants";
+import { COOKIE_NAME, FORGET_PASSWORD_PREFIX } from "../constants";
+import { UsernamePasswordInput } from "./UsernamePasswordInput";
 require("dotenv").config();
 
 //type response for errors, user friendly error message for ui
@@ -27,16 +25,26 @@ class LoginResponse {
   @Field(() => [FieldError], { nullable: true })
   errors?: FieldError[];
 
-  @Field()
-  accessToken?: string;
   @Field(() => User, { nullable: true })
   user?: User;
 }
 
 
 //creating graphql schema
-@Resolver()
+@Resolver(User)
 export class UserResolver {
+  //stop users from seeing other peoples emails
+  @FieldResolver(() => String)
+  email(@Root() user: User, @Ctx() { req }: MyContext) {
+    //okay for user to see their own email
+    if (req.session.userId === user.id) {
+      return user.email;
+    }
+    //stop current user from seeing somone elses email
+    return "";
+  }
+  
+  
   @Mutation(() => LoginResponse)
   async changePassword(
     @Arg('token') token: string,
@@ -54,8 +62,9 @@ export class UserResolver {
     }
 
     //validate token in redis
-    const key = FORGET_PASSWORD_PREFIX + token
+    const key = FORGET_PASSWORD_PREFIX + token;
     const userId = await redis.get(key);
+
     if (!userId) {
       return { errors: [
         {
@@ -63,10 +72,11 @@ export class UserResolver {
           message: "expired token",
         },
       ],
-    }
+    };
     }
 
-    const user = await User.findOneBy({ id: parseInt(userId) });
+    const userIdNum = parseInt(userId)
+    const user = await User.findOneBy({ id: userIdNum });
 
     if (!user) {
       return { errors: [
@@ -78,7 +88,7 @@ export class UserResolver {
     }
     }
 
-    user.password = await hash(newPassword, 12);
+    await User.update({ id: userIdNum }, { password: await hash(newPassword, 12) })
 
     redis.del()
 
@@ -99,14 +109,17 @@ export class UserResolver {
     const user = await User.findOne({ where: { email } });
 
     if (!user) {
-      return {
-        errors: [
-          {
-          field: "email",
-          message: "incorrect email/password",
-        },
-      ],
-      };
+      // return {
+      //   errors: [
+      //     {
+      //     field: "email",
+      //     message: "email does not exist",
+      //   },
+      // ],
+      // };
+
+      //deter against guessing an email
+      return true;
     }
 
     const token = v4();
@@ -147,51 +160,37 @@ export class UserResolver {
 
   //getting logged in user
   @Query(() => User, {nullable: true})
-  me(
-    @Ctx() context: MyContext
+  async me(
+    @Ctx() { req }: MyContext
   ) {
-    //read token from header to get user
-    const authorization = context.req.headers['authorization'];
-
-    if (!authorization) {
+    //not logged in
+    if (!req.session.userId) {
       return null;
     }
 
-    try {
-      const token = authorization.split(" ")[1];
-      const payload: any = verify(token, process.env.ACCESS_TOKEN_SECRET!);
-      return User.findOne({where: payload.userId});
-    } catch(err) {
-      console.log(err)
-      return null;
-    }
+    return await User.findOneBy(req.session.userId);
   }
 
 
   //logging user out
   @Mutation(() => Boolean)
-  async logout(@Ctx() {res}: MyContext) {
-    //send empty refresh token
-    sendRefreshToken(res, "");
-     
-    return true;
+  async logout(@Ctx() { req, res }: MyContext) {
+    //remove session in redis
+    return new Promise((resolve => req.session.destroy(err => {
+      res.clearCookie(COOKIE_NAME);
+      if (err) {
+        //incase of error
+        console.log(err);
+        resolve(false)
+        return ;
+      }
+
+      resolve(true);
+    })) 
+      
+    );
  }
 
-
-  /*
-      REPLACE WITH A FORGOT PASSWORD FUNCTION
-      NOT GOOD PRACTICE TO BE EXPOSED
-  */
- @Mutation(() => Boolean)
- async revokeRefreshTokensForUser(
-  @Arg('userId', () => Int) userId: number
- ) {
-    await AppDataSource.getRepository(User)
-      .increment({ id: userId }, "tokenVersion", 1);
-     
-    return true;
- }
-    
 
   //logging in
   @Mutation(() => LoginResponse)
@@ -199,7 +198,7 @@ export class UserResolver {
     @Arg('email') email: string,
     @Arg('password') password: string,
     //access context for refresh token
-    @Ctx() { res }: MyContext
+    @Ctx() { req }: MyContext
   ): Promise<LoginResponse> {
 
     //check user exists
@@ -230,37 +229,81 @@ export class UserResolver {
       };
     }
 
-    //successful login
-    sendRefreshToken(res, createRefreshToken(user));
+    req.session.userId = user.id;
 
     return {
-      accessToken: createAccessToken(user),
       user
     };
   }
 
 
   //mutations used to make change to db, eg update create
-  @Mutation(() => Boolean)
-  async register(
-    @Arg('email') email: string,
-    @Arg('password') password: string
-  ) {
 
-    const hashedPassword = await hash(password, 12);
+  //register user
+  @Mutation(() => LoginResponse)
+  async register(
+    @Arg('options') options: UsernamePasswordInput,
+    @Ctx() { req }: MyContext
+  ): Promise<LoginResponse> {
+
+    if (!options.email.includes('@')) {
+      return {
+        errors: [
+          {
+            field: "email",
+            message: "invalid email"
+          }
+        ]
+      }
+    }
+
+    /*
+      TO DO:  NOT WORKING COME BACK AND REFACTOR
+    */
+    if (options.password.length <= 3) {
+      return {
+        errors: [
+          {
+            field: "password",
+            message: "length must be greater than 3"
+          }
+        ]
+      }
+    }
+
+    const hashedPassword = await hash(options.password, 12);
+    let user;
 
     try {
       //inserting user into db
-      await User.insert({
-        email,
-        password: hashedPassword
-      })
+      // User.create({}).save()
+      // or 
+      const result = await AppDataSource
+        .createQueryBuilder()
+        .insert()
+        .into(User)
+        .values({
+            email: options.email,
+            password: hashedPassword
+        })
+        .returning("*").execute();
+      user = result.raw[0];
     } catch (err) {
-      console.log(err);
-      return false;
+      if (err.code === "23505") {
+        return {
+          errors: [
+            {
+              field: "username",
+              message: "username taken",
+            },
+          ],
+        };
+      }
     }
 
+    //store user id session, setting cookie on user keeps them logged in
+    req.session.userId = user.id;
 
-    return true;
+    return { user };
   }
 }
