@@ -13,17 +13,21 @@ const UserResolver_1 = require("./resolvers/UserResolver");
 const PostResolver_1 = require("./resolvers/PostResolver");
 const type_graphql_1 = require("type-graphql");
 const data_source_1 = require("./data-source");
+const cors_1 = __importDefault(require("cors"));
 const ioredis_1 = __importDefault(require("ioredis"));
-const Post_1 = require("./entity/Post");
 const createUserLoader_1 = require("./utils/createUserLoader");
 const main = async () => {
     await data_source_1.AppDataSource.initialize();
-    await Post_1.Post.delete({});
     const app = (0, express_1.default)();
     let RedisStore = require("connect-redis")(express_session_1.default);
     const redis = new ioredis_1.default();
+    app.set('trust proxy', 1);
+    app.use((0, cors_1.default)({
+        credentials: true,
+        origin: process.env.CORS_ORIGIN
+    }));
     app.use((0, express_session_1.default)({
-        name: constants_1.COOKIE_NAME,
+        name: process.env.COOKIE_NAME,
         store: new RedisStore({
             client: redis,
             disableTouch: true,
@@ -31,11 +35,12 @@ const main = async () => {
         cookie: {
             maxAge: 1000 * 60 * 60 * 24 * 365 * 10,
             httpOnly: true,
-            sameSite: "lax",
-            secure: false,
+            sameSite: 'lax',
+            secure: constants_1.__prod__,
+            domain: constants_1.__prod__ ? ".peteine.com" : undefined,
         },
         saveUninitialized: false,
-        secret: 'onkcwaonjcaqon',
+        secret: process.env.SESSION_SECRET,
         resave: false,
     }));
     const apolloServer = new apollo_server_express_1.ApolloServer({
@@ -54,11 +59,11 @@ const main = async () => {
     apolloServer.applyMiddleware({
         app,
         cors: {
-            origin: ["http://localhost:3000",],
+            origin: [process.env.CORS_ORIGIN],
             credentials: true
         },
     });
-    app.listen(4000, () => {
+    app.listen(parseInt(process.env.PORT), () => {
         console.log("express server started.");
     });
 };
