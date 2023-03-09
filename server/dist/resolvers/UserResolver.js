@@ -117,7 +117,7 @@ let UserResolver = class UserResolver {
         if (!req.session.userId) {
             return null;
         }
-        return await User_1.User.findOneBy(req.session.userId);
+        return await User_1.User.findOneBy({ id: req.session.userId });
     }
     async logout({ req, res }) {
         return new Promise((resolve => req.session.destroy(err => {

@@ -168,7 +168,7 @@ export class UserResolver {
       return null;
     }
 
-    return await User.findOneBy(req.session.userId);
+    return await User.findOneBy({ id: req.session.userId });
   }
 
 
