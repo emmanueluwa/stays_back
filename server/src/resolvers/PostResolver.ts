@@ -124,33 +124,21 @@ export class PostResolver {
     //pagination also an option to do limit/offset
     @Arg("limit", () => Int) limit: number,
     @Arg("cursor", () => String, { nullable: true }) cursor: string | null,
-    @Ctx() {req}: MyContext
   ): Promise<PaginatedPosts> {
     const realLimit = Math.min(15, limit);
     const realLimitPlusOne = realLimit + 1;
 
     const replacements: any[] = [realLimitPlusOne];
 
-    if (req.session.userId) {
-      replacements.push(req.session.userId);
-    }
-
-    let cursorIndex = 3;
     if (cursor) {
       replacements.push(new Date(parseInt(cursor)));
-      cursorIndex = replacements.length;
     }
 
     const posts = await AppDataSource.query(
       `
-        select p.*,
-        ${
-          req.session.userId 
-          ? ',(select value from star where "userId" = $2 and "postId" = p.id) "voteStatus"' 
-          : 'null as "voteStatus"'
-        }
+        select p.*
         from post p
-        ${cursor ? `where p."createdAt" < ${cursorIndex}` : ""}
+        ${cursor ? `where p."createdAt" < $2` : ""}
         order by p."createdAt" DESC
         limit $1
       `,
