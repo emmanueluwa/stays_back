@@ -10,7 +10,7 @@ import path from "path"
 export const AppDataSource = new DataSource({
     type: "postgres",
     url: process.env.DATABASE_URL,
-    // synchronize: true,
+    synchronize: true,
     migrations: [path.join(__dirname, "./migrations/*")],
     logging: true,
     entities: [User, Post, Star],

@@ -18,6 +18,7 @@ const ioredis_1 = __importDefault(require("ioredis"));
 const createUserLoader_1 = require("./utils/createUserLoader");
 const main = async () => {
     await data_source_1.AppDataSource.initialize();
+    await data_source_1.AppDataSource.runMigrations();
     const app = (0, express_1.default)();
     let RedisStore = require("connect-redis")(express_session_1.default);
     const redis = new ioredis_1.default();

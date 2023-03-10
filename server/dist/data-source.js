@@ -14,6 +14,7 @@ const path_1 = __importDefault(require("path"));
 exports.AppDataSource = new typeorm_1.DataSource({
     type: "postgres",
     url: process.env.DATABASE_URL,
+    synchronize: true,
     migrations: [path_1.default.join(__dirname, "./migrations/*")],
     logging: true,
     entities: [User_1.User, Post_1.Post, Star_1.Star],

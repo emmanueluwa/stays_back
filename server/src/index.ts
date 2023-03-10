@@ -19,7 +19,7 @@ import { createUserLoader } from "./utils/createUserLoader";
 const main = async () => {
     //creating a connection
     await AppDataSource.initialize();
-    // await AppDataSource.runMigrations();
+    await AppDataSource.runMigrations();
     // await Post.delete({});
 
     // sendEmail("bob@bob.com", "hello there");

@@ -11,10 +11,6 @@ export class Post extends BaseEntity {
   id!: number;
 
   @Field()
-  @Column({ unique: true })
-  email!: string;
-
-  @Field()
   @Column()
   title!: string;
 
